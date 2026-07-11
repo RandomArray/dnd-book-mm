@@ -1,0 +1,58 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: ./api
+    restart: unless-stopped
+    env_file:
+      - .env.prod
+    depends_on:
+      db:
+        condition: service_healthy
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile.prod
+    restart: unless-stopped
+    depends_on:
+      - api
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=${TRAEFIK_NETWORK}
+      - traefik.http.routers.mm.rule=Host(`${DOMAIN}`)
+      - traefik.http.routers.mm.entrypoints=${TRAEFIK_ENTRYPOINT}
+      - traefik.http.routers.mm.tls=true
+      - traefik.http.routers.mm.tls.certresolver=${TRAEFIK_CERTRESOLVER}
+      - traefik.http.services.mm.loadbalancer.server.port=80
+      - traefik.http.routers.mm.middlewares=mm-headers
+      - traefik.http.middlewares.mm-headers.headers.frameDeny=true
+      - traefik.http.middlewares.mm-headers.headers.contentTypeNosniff=true
+      - traefik.http.middlewares.mm-headers.headers.browserXssFilter=true
+      - traefik.http.middlewares.mm-headers.headers.referrerPolicy=strict-origin-when-cross-origin
+    networks:
+      - default
+      - traefik
+
+volumes:
+  postgres_data:
+
+networks:
+  traefik:
+    external: true
+    name: ${TRAEFIK_NETWORK}

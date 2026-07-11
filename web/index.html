@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Open Monster Manual</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;700&family=Sora:wght@400;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="hero">
+      <h1>Open Monster Manual</h1>
+      <p>
+        Mobile-first, legally safe fantasy monster index with classic-style categories,
+        alphabetical ordering, and per-group numbering.
+      </p>
+    </header>
+
+    <main class="layout">
+      <section class="stats-strip" id="statsStrip" aria-live="polite">
+        <article class="stat-card">
+          <h2>Total Monsters</h2>
+          <p id="statTotalMonsters">--</p>
+        </article>
+        <article class="stat-card">
+          <h2>Monster Types</h2>
+          <p id="statTotalTypes">--</p>
+        </article>
+        <article class="stat-card">
+          <h2>Toughest Entry</h2>
+          <p id="statToughest">--</p>
+        </article>
+        <article class="stat-card">
+          <h2>Top Alignment</h2>
+          <p id="statTopAlignment">--</p>
+        </article>
+      </section>
+
+      <section class="controls">
+        <label for="search">Search monster name</label>
+        <input id="search" type="text" placeholder="Try: goblin, troll, skeleton" />
+
+        <label for="typeFilter">Filter by type</label>
+        <select id="typeFilter">
+          <option value="">All Types</option>
+        </select>
+
+        <button id="refreshBtn">Refresh</button>
+      </section>
+
+      <section id="groups" class="groups"></section>
+    </main>
+
+    <template id="groupTemplate">
+      <article class="group">
+        <button class="group-toggle" type="button" aria-expanded="false">
+          <span class="group-title"></span>
+          <span class="group-indicator">+</span>
+        </button>
+        <div class="cards" hidden></div>
+      </article>
+    </template>
+
+    <template id="cardTemplate">
+      <article class="card">
+        <button class="name-toggle" type="button" aria-expanded="false">
+          <span class="name"></span>
+          <span class="toggle-indicator">+</span>
+        </button>
+        <div class="details" hidden>
+          <p class="summary"></p>
+          <dl class="stats"></dl>
+        </div>
+      </article>
+    </template>
+
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>
