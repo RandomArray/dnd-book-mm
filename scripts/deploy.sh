@@ -11,7 +11,9 @@ if [[ ! -f .env.prod ]]; then
   exit 1
 fi
 
-docker compose -f docker-compose.prod.yml pull || true
-docker compose -f docker-compose.prod.yml up -d --build
+COMPOSE_ARGS=(--env-file .env.prod -f docker-compose.prod.yml)
 
-docker compose -f docker-compose.prod.yml ps
+docker compose "${COMPOSE_ARGS[@]}" pull || true
+docker compose "${COMPOSE_ARGS[@]}" up -d --build
+
+docker compose "${COMPOSE_ARGS[@]}" ps
