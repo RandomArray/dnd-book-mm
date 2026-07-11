@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Open Monster Manual icon">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#122a42" />
+      <stop offset="100%" stop-color="#4f1221" />
+    </linearGradient>
+    <linearGradient id="shield" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#de442d" />
+      <stop offset="100%" stop-color="#981616" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="96" fill="url(#bg)" />
+  <path
+    d="M256 72 404 170 364 354 256 440 148 354 108 170Z"
+    fill="url(#shield)"
+    stroke="#f8d378"
+    stroke-width="18"
+    stroke-linejoin="round"
+  />
+  <g fill="#f7d67a" font-family="Segoe UI Black, Arial Black, sans-serif" font-size="102" font-weight="900" text-anchor="middle">
+    <text x="256" y="258">D20</text>
+  </g>
+  <g fill="#ffefc1">
+    <circle cx="256" cy="332" r="11" />
+    <circle cx="206" cy="332" r="11" />
+    <circle cx="306" cy="332" r="11" />
+  </g>
+</svg>

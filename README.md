@@ -53,19 +53,16 @@ Files:
 - `.env.prod.example`
 - `scripts/deploy.sh`
 - `scripts/update.sh`
+- `web/nginx.dev.conf` (local development web config)
+- `web/nginx.prod.conf` (production web image config)
 
 ### One-time server setup
 
 1. Clone repo on server.
-2. Copy env template:
-
-  `cp .env.prod.example .env.prod`
-
+2. Copy env template: `cp .env.prod.example .env.prod`
 3. Set secure values in `.env.prod`.
 4. Ensure external Traefik Docker network exists and matches `TRAEFIK_NETWORK`.
-5. Run deploy:
-
-  `bash scripts/deploy.sh`
+5. Run deploy: `bash scripts/deploy.sh`
 
 ### Update flow
 
