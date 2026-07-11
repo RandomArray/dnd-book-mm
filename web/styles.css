@@ -84,9 +84,6 @@ body {
   border: 1px solid var(--line);
   border-radius: 0.8rem;
   padding: 0.9rem;
-  position: sticky;
-  top: 0.5rem;
-  z-index: 3;
 }
 
 label {
@@ -270,6 +267,12 @@ button:hover {
   .layout {
     grid-template-columns: 280px 1fr;
     align-items: start;
+  }
+
+  .controls {
+    position: sticky;
+    top: 0.5rem;
+    z-index: 3;
   }
 
   .stats-strip {
