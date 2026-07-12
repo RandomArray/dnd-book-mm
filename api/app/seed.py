@@ -1,5 +1,6 @@
 import json
 import os
+import re
 from collections.abc import Generator
 from pathlib import Path
 from urllib.error import URLError
@@ -32,6 +33,9 @@ BLOCKED_NAMES = {
 OPEN5E_ENDPOINT = "https://api.open5e.com/v1/monsters/?limit=100"
 MIN_TARGET_MONSTERS = 400
 CACHE_FILE = Path(__file__).parent / "data" / "open5e_cache.json"
+_ALIGNMENT_WORD_RE = re.compile(r"[A-Za-z]+")
+_SPACE_RE = re.compile(r"\s+")
+_PAREN_CONTENT_RE = re.compile(r"\s*\([^)]*\)")
 
 
 def _classic_type(raw_type: str) -> str:
@@ -101,6 +105,58 @@ def _source_payload_from_open5e(entry: dict) -> dict:
     }
 
 
+def _normalize_alignment(raw_alignment: object) -> str:
+    value = str(raw_alignment or "").replace("_", " ").strip()
+    value = _SPACE_RE.sub(" ", value)
+    if not value:
+        return "Neutral"
+
+    lower = value.lower()
+
+    def _title_alignment_text(text: str) -> str:
+        def _normalize_word(match: re.Match[str]) -> str:
+            token = match.group(0)
+            if token in {"or", "and", "of", "the", "a", "an", "as", "its", "to"}:
+                return token
+            return token.capitalize()
+
+        normalized_text = _ALIGNMENT_WORD_RE.sub(_normalize_word, text)
+        return normalized_text[0].upper() + normalized_text[1:] if normalized_text else ""
+
+    if lower.startswith("any"):
+        # Open5e sometimes includes long qualifiers; for filtering UX keep canonical Any variants.
+        if lower.startswith("any alignment ("):
+            return "Neutral"
+
+        cleaned = _PAREN_CONTENT_RE.sub("", lower)
+        cleaned = _SPACE_RE.sub(" ", cleaned).strip()
+
+        if cleaned in {"any", "any alignment"}:
+            return "Neutral"
+
+        if cleaned.startswith("any "):
+            rest = cleaned[4:].strip()
+            if rest.endswith(" alignment"):
+                rest = rest[: -len(" alignment")].strip()
+            if not rest:
+                return "Neutral"
+            return _title_alignment_text(rest)[:32]
+
+    normalized = _title_alignment_text(lower)
+    return normalized[:32]
+
+
+def _normalize_existing_alignments(db: Session) -> bool:
+    changed = False
+    monsters = db.execute(select(Monster)).scalars().all()
+    for monster in monsters:
+        normalized = _normalize_alignment(monster.alignment)
+        if monster.alignment != normalized:
+            monster.alignment = normalized
+            changed = True
+    return changed
+
+
 def _monster_payload_from_open5e(entry: dict) -> dict:
     desc = (entry.get("desc") or "").replace("\n", " ").strip()
     if not desc:
@@ -114,7 +170,7 @@ def _monster_payload_from_open5e(entry: dict) -> dict:
         "attacks": _short_actions(entry),
         "movement": _speed_text(entry.get("speed")),
         "morale": "-",
-        "alignment": str(entry.get("alignment") or "Neutral")[:32],
+        "alignment": _normalize_alignment(entry.get("alignment") or "Neutral"),
         "summary": desc[:320],
     }
 
@@ -197,6 +253,9 @@ def _name_is_allowed(name: str) -> bool:
 def seed_database(db: Session) -> None:
     payload = _load_seed_payload()
 
+    if _normalize_existing_alignments(db):
+        db.commit()
+
     source_map: dict[str, Source] = {}
     for src in payload["sources"]:
         src.setdefault("source_url", "")
@@ -229,7 +288,7 @@ def seed_database(db: Session) -> None:
                 attacks=item["attacks"],
                 movement=item["movement"],
                 morale=item["morale"],
-                alignment=item["alignment"],
+                alignment=_normalize_alignment(item["alignment"]),
                 summary=item["summary"],
                 legal_safe=True,
             )

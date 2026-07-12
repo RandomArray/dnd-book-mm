@@ -2,14 +2,178 @@ const API_BASE = "/api";
 
 const groupsEl = document.getElementById("groups");
 const typeFilterEl = document.getElementById("typeFilter");
+const alignmentFilterEl = document.getElementById("alignmentFilter");
 const searchEl = document.getElementById("search");
-const refreshBtn = document.getElementById("refreshBtn");
+const resetFiltersBtn = document.getElementById("resetFiltersBtn");
+const favoritesOnlyBtn = document.getElementById("favoritesOnlyBtn");
+const favoritesCountEl = document.getElementById("favoritesCount");
+const favoritesListEl = document.getElementById("favoritesList");
+const clearFavoritesBtn = document.getElementById("clearFavoritesBtn");
+const confirmClearDialog = document.getElementById("confirmClearDialog");
 const statTotalMonstersEl = document.getElementById("statTotalMonsters");
 const statTotalTypesEl = document.getElementById("statTotalTypes");
 const statToughestEl = document.getElementById("statToughest");
 const statTopAlignmentEl = document.getElementById("statTopAlignment");
 const groupTemplate = document.getElementById("groupTemplate");
 const cardTemplate = document.getElementById("cardTemplate");
+
+const FAVORITES_STORAGE_KEY = "omm:favorites:v1";
+let favoritesOnly = false;
+let pendingFocusMonsterId = null;
+const knownAlignments = new Set();
+
+function alignmentValue(row) {
+  const raw = String(row?.stats?.alignment || "").trim();
+  return raw || "Unknown";
+}
+
+function renderAlignmentOptions() {
+  const selected = alignmentFilterEl.value;
+  alignmentFilterEl.innerHTML = '<option value="">All Alignments</option>';
+
+  Array.from(knownAlignments)
+    .sort((a, b) => a.localeCompare(b))
+    .forEach((name) => {
+      const option = document.createElement("option");
+      option.value = name;
+      option.textContent = name;
+      alignmentFilterEl.appendChild(option);
+    });
+
+  alignmentFilterEl.value = knownAlignments.has(selected) ? selected : "";
+}
+
+function collectAlignments(rows) {
+  let changed = false;
+  rows.forEach((row) => {
+    const value = alignmentValue(row);
+    if (!knownAlignments.has(value)) {
+      knownAlignments.add(value);
+      changed = true;
+    }
+  });
+
+  if (changed) {
+    renderAlignmentOptions();
+  }
+}
+
+function loadFavorites() {
+  try {
+    const raw = localStorage.getItem(FAVORITES_STORAGE_KEY);
+    if (!raw) {
+      return {};
+    }
+
+    const list = JSON.parse(raw);
+    if (!Array.isArray(list)) {
+      return {};
+    }
+
+    return list.reduce((acc, item) => {
+      if (!item || typeof item.id !== "string" || typeof item.name !== "string") {
+        return acc;
+      }
+
+      acc[item.id] = {
+        id: item.id,
+        name: item.name,
+        type: String(item.type || "Unknown"),
+        source: String(item.source || "Unknown"),
+      };
+      return acc;
+    }, {});
+  } catch {
+    return {};
+  }
+}
+
+let favoritesById = loadFavorites();
+
+function saveFavorites() {
+  localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(Object.values(favoritesById)));
+}
+
+function monsterId(monster) {
+  return `${String(monster.type || "").trim().toLowerCase()}::${String(monster.name || "")
+    .trim()
+    .toLowerCase()}`;
+}
+
+function isFavorite(monster) {
+  return Boolean(favoritesById[monsterId(monster)]);
+}
+
+function setFavoritesOnlyButtonState() {
+  favoritesOnlyBtn.setAttribute("aria-pressed", String(favoritesOnly));
+  favoritesOnlyBtn.setAttribute(
+    "aria-label",
+    favoritesOnly ? "Show all monsters" : "Show favorites only",
+  );
+  favoritesOnlyBtn.setAttribute(
+    "title",
+    favoritesOnly ? "Show all monsters" : "Show favorites only",
+  );
+  favoritesOnlyBtn.innerHTML = favoritesOnly
+    ? '<span class="btn-icon" aria-hidden="true">☰</span><span class="btn-label">All</span>'
+    : '<span class="btn-icon" aria-hidden="true">★</span><span class="btn-label">Favorites</span>';
+}
+
+function renderFavoritesManager() {
+  const favorites = Object.values(favoritesById).sort((a, b) => a.name.localeCompare(b.name));
+  favoritesCountEl.textContent = String(favorites.length);
+  clearFavoritesBtn.disabled = favorites.length === 0;
+  favoritesListEl.innerHTML = "";
+
+  if (!favorites.length) {
+    favoritesListEl.innerHTML = '<li class="favorites-empty">No favorites yet.</li>';
+    return;
+  }
+
+  favorites.forEach((item) => {
+    const li = document.createElement("li");
+    li.className = "favorite-item";
+
+    const jumpBtn = document.createElement("button");
+    jumpBtn.type = "button";
+    jumpBtn.className = "favorite-jump";
+    jumpBtn.innerHTML = `<span>${escapeHtml(item.name)}</span><small>${escapeHtml(item.type)}</small>`;
+    jumpBtn.addEventListener("click", () => {
+      searchEl.value = item.name;
+      typeFilterEl.value = "";
+      alignmentFilterEl.value = "";
+      favoritesOnly = false;
+      pendingFocusMonsterId = item.id;
+      setFavoritesOnlyButtonState();
+      loadMonsters();
+    });
+
+    const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.className = "favorite-remove";
+    removeBtn.innerHTML = '<span aria-hidden="true">✕</span>';
+    removeBtn.setAttribute("aria-label", `Remove ${item.name} from favorites`);
+    removeBtn.title = "Remove from favorites";
+    removeBtn.addEventListener("click", () => {
+      delete favoritesById[item.id];
+      saveFavorites();
+      renderFavoritesManager();
+      loadMonsters();
+    });
+
+    li.appendChild(jumpBtn);
+    li.appendChild(removeBtn);
+    favoritesListEl.appendChild(li);
+  });
+}
+
+function applyFavoriteButtonState(buttonEl, state) {
+  buttonEl.setAttribute("aria-pressed", String(state));
+  buttonEl.textContent = state ? "★" : "☆";
+  buttonEl.title = state ? "Remove from favorites" : "Add to favorites";
+  buttonEl.setAttribute("aria-label", state ? "Remove from favorites" : "Add to favorites");
+  buttonEl.classList.toggle("is-favorite", state);
+}
 
 function escapeHtml(text) {
   return String(text || "")
@@ -169,6 +333,7 @@ function statEntries(stats) {
 
 function renderGroups(rows) {
   groupsEl.innerHTML = "";
+  let focusedCardEl = null;
 
   const byType = rows.reduce((acc, item) => {
     if (!acc[item.type]) {
@@ -200,8 +365,10 @@ function renderGroups(rows) {
 
       byType[typeName].forEach((monster) => {
         const cardNode = cardTemplate.content.cloneNode(true);
+        const cardEl = cardNode.querySelector(".card");
         cardNode.querySelector(".name").textContent = `${monster.groupNumber}. ${monster.name}`;
         const toggleBtn = cardNode.querySelector(".name-toggle");
+        const favoriteBtn = cardNode.querySelector(".favorite-btn");
         const detailsEl = cardNode.querySelector(".details");
         const indicatorEl = cardNode.querySelector(".toggle-indicator");
 
@@ -214,6 +381,31 @@ function renderGroups(rows) {
 
         const summaryEl = cardNode.querySelector(".summary");
         summaryEl.innerHTML = markdownToHtml(monster.summary);
+
+        const favoriteState = isFavorite(monster);
+        applyFavoriteButtonState(favoriteBtn, favoriteState);
+        favoriteBtn.addEventListener("click", () => {
+          const id = monsterId(monster);
+          let nextState = true;
+          if (favoritesById[id]) {
+            delete favoritesById[id];
+            nextState = false;
+          } else {
+            favoritesById[id] = {
+              id,
+              name: monster.name,
+              type: monster.type,
+              source: monster.source,
+            };
+          }
+
+          applyFavoriteButtonState(favoriteBtn, nextState);
+          saveFavorites();
+          renderFavoritesManager();
+          if (favoritesOnly && !nextState) {
+            loadMonsters();
+          }
+        });
 
         const sourceRow = document.createElement("p");
         sourceRow.className = "source-row";
@@ -241,6 +433,16 @@ function renderGroups(rows) {
           statsEl.appendChild(wrapper);
         });
 
+        if (pendingFocusMonsterId && pendingFocusMonsterId === monsterId(monster)) {
+          groupToggleEl.setAttribute("aria-expanded", "true");
+          cardsEl.hidden = false;
+          groupIndicatorEl.textContent = "-";
+          toggleBtn.setAttribute("aria-expanded", "true");
+          detailsEl.hidden = false;
+          indicatorEl.textContent = "-";
+          focusedCardEl = cardEl;
+        }
+
         cardsEl.appendChild(cardNode);
       });
 
@@ -250,6 +452,14 @@ function renderGroups(rows) {
   if (!rows.length) {
     groupsEl.innerHTML = "<p>No monsters match the current filters.</p>";
   }
+
+  if (focusedCardEl) {
+    requestAnimationFrame(() => {
+      focusedCardEl.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  }
+
+  pendingFocusMonsterId = null;
 }
 
 async function loadTypes() {
@@ -275,17 +485,76 @@ async function loadMonsters() {
 
   const res = await fetch(`${API_BASE}/monsters?${params.toString()}`);
   const rows = await res.json();
-  updateStats(rows);
-  renderGroups(rows);
+  collectAlignments(rows);
+
+  let visibleRows = favoritesOnly ? rows.filter((row) => isFavorite(row)) : rows;
+  if (alignmentFilterEl.value) {
+    visibleRows = visibleRows.filter((row) => alignmentValue(row) === alignmentFilterEl.value);
+  }
+
+  updateStats(visibleRows);
+  renderGroups(visibleRows);
 }
 
-refreshBtn.addEventListener("click", loadMonsters);
+function resetFilters() {
+  searchEl.value = "";
+  typeFilterEl.value = "";
+  alignmentFilterEl.value = "";
+  favoritesOnly = false;
+  setFavoritesOnlyButtonState();
+  loadMonsters();
+}
+
+resetFiltersBtn.addEventListener("click", resetFilters);
 searchEl.addEventListener("keydown", (evt) => {
   if (evt.key === "Enter") {
     loadMonsters();
   }
 });
 typeFilterEl.addEventListener("change", loadMonsters);
+alignmentFilterEl.addEventListener("change", loadMonsters);
+
+favoritesOnlyBtn.addEventListener("click", () => {
+  const wasFavoritesOnly = favoritesOnly;
+  favoritesOnly = !favoritesOnly;
+
+  if (wasFavoritesOnly && !favoritesOnly && searchEl.value.trim()) {
+    searchEl.value = "";
+  }
+
+  setFavoritesOnlyButtonState();
+  loadMonsters();
+});
+
+clearFavoritesBtn.addEventListener("click", () => {
+  if (confirmClearDialog && typeof confirmClearDialog.showModal === "function") {
+    confirmClearDialog.showModal();
+    return;
+  }
+
+  if (window.confirm("Clear all favorites?")) {
+    favoritesById = {};
+    saveFavorites();
+    renderFavoritesManager();
+    loadMonsters();
+  }
+});
+
+if (confirmClearDialog) {
+  confirmClearDialog.addEventListener("close", () => {
+    if (confirmClearDialog.returnValue !== "confirm") {
+      return;
+    }
+
+    favoritesById = {};
+    saveFavorites();
+    renderFavoritesManager();
+    loadMonsters();
+  });
+}
+
+setFavoritesOnlyButtonState();
+renderFavoritesManager();
 
 loadTypes().then(loadMonsters).catch((err) => {
   groupsEl.innerHTML = `<p>Failed to load data: ${err.message}</p>`;

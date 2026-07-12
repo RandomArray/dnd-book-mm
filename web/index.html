@@ -60,7 +60,52 @@
           <option value="">All Types</option>
         </select>
 
-        <button id="refreshBtn">Refresh</button>
+        <label for="alignmentFilter">Filter by alignment</label>
+        <select id="alignmentFilter">
+          <option value="">All Alignments</option>
+        </select>
+
+        <div class="controls-actions">
+          <button
+            id="resetFiltersBtn"
+            type="button"
+            class="compact-btn"
+            aria-label="Reset filters"
+            title="Reset filters"
+          >
+            <span class="btn-icon" aria-hidden="true">↺</span>
+            <span class="btn-label">Reset</span>
+            </button>
+            <button
+              id="favoritesOnlyBtn"
+              type="button"
+              class="ghost-btn compact-btn"
+              aria-pressed="false"
+              aria-label="Show favorites only"
+              title="Show favorites only"
+            >
+              <span class="btn-icon" aria-hidden="true">★</span>
+              <span class="btn-label">Favorites</span>
+          </button>
+        </div>
+
+        <section class="favorites-panel" aria-live="polite">
+          <div class="favorites-header">
+            <h2>Favorites</h2>
+            <span id="favoritesCount" class="favorites-count">0</span>
+          </div>
+          <ul id="favoritesList" class="favorites-list"></ul>
+          <button
+            id="clearFavoritesBtn"
+            type="button"
+            class="ghost-btn danger-btn compact-btn"
+            aria-label="Clear favorites"
+            title="Clear favorites"
+          >
+            <span class="btn-icon" aria-hidden="true">✖</span>
+            <span class="btn-label">Clear</span>
+          </button>
+        </section>
       </section>
 
       <section id="groups" class="groups"></section>
@@ -78,16 +123,44 @@
 
     <template id="cardTemplate">
       <article class="card">
-        <button class="name-toggle" type="button" aria-expanded="false">
-          <span class="name"></span>
-          <span class="toggle-indicator">+</span>
-        </button>
+        <div class="card-head">
+          <button class="name-toggle" type="button" aria-expanded="false">
+            <span class="name"></span>
+            <span class="toggle-indicator">+</span>
+          </button>
+          <button
+            class="favorite-btn"
+            type="button"
+            aria-pressed="false"
+            aria-label="Add to favorites"
+            title="Add to favorites"
+          >
+            ☆
+          </button>
+        </div>
         <div class="details" hidden>
           <div class="summary"></div>
           <dl class="stats"></dl>
         </div>
       </article>
     </template>
+
+    <dialog id="confirmClearDialog" class="confirm-dialog">
+      <form method="dialog" class="confirm-content">
+        <h2>Clear favorites?</h2>
+        <p>This removes all saved favorites from this device.</p>
+        <menu>
+          <button value="cancel" class="ghost-btn compact-btn" type="submit">
+            <span class="btn-icon" aria-hidden="true">↩</span>
+            <span class="btn-label">Cancel</span>
+          </button>
+          <button value="confirm" class="danger-btn compact-btn" type="submit">
+            <span class="btn-icon" aria-hidden="true">✖</span>
+            <span class="btn-label">Clear</span>
+          </button>
+        </menu>
+      </form>
+    </dialog>
 
     <script type="module" src="./main.js"></script>
   </body>
