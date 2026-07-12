@@ -11,6 +11,107 @@ const statTopAlignmentEl = document.getElementById("statTopAlignment");
 const groupTemplate = document.getElementById("groupTemplate");
 const cardTemplate = document.getElementById("cardTemplate");
 
+function escapeHtml(text) {
+  return String(text || "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function safeHref(rawUrl) {
+  try {
+    const url = new URL(String(rawUrl || "").trim(), window.location.origin);
+    if (url.protocol === "http:" || url.protocol === "https:") {
+      return url.href;
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
+function inlineMarkdown(text) {
+  const source = String(text || "");
+  let out = "";
+  let cursor = 0;
+  const linkPattern = /\[([^\]]+)\]\(([^)]+)\)/g;
+  let match;
+
+  const formatInline = (chunk) =>
+    escapeHtml(chunk)
+      .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+      .replace(/\*([^*]+)\*/g, "<em>$1</em>")
+      .replace(/`([^`]+)`/g, "<code>$1</code>");
+
+  while ((match = linkPattern.exec(source)) !== null) {
+    const [full, label, url] = match;
+    out += formatInline(source.slice(cursor, match.index));
+    const href = safeHref(url);
+    if (href) {
+      out += `<a class="summary-link" href="${escapeHtml(href)}" target="_blank" rel="noreferrer noopener">${formatInline(label)}</a>`;
+    } else {
+      out += formatInline(full);
+    }
+    cursor = match.index + full.length;
+  }
+
+  out += formatInline(source.slice(cursor));
+  return out;
+}
+
+function markdownToHtml(markdown) {
+  const normalized = String(markdown || "").replaceAll("_", " ");
+  const lines = normalized.replace(/\r\n/g, "\n").split("\n");
+  const blocks = [];
+  let listType = null;
+
+  const closeList = () => {
+    if (listType) {
+      blocks.push(`</${listType}>`);
+      listType = null;
+    }
+  };
+
+  lines.forEach((line) => {
+    const unordered = line.match(/^\s*[-*]\s+(.+)$/);
+    const ordered = line.match(/^\s*\d+\.\s+(.+)$/);
+
+    if (!line.trim()) {
+      closeList();
+      return;
+    }
+
+    if (unordered) {
+      if (listType !== "ul") {
+        closeList();
+        listType = "ul";
+        blocks.push("<ul>");
+      }
+      blocks.push(`<li>${inlineMarkdown(unordered[1])}</li>`);
+      return;
+    }
+
+    if (ordered) {
+      if (listType !== "ol") {
+        closeList();
+        listType = "ol";
+        blocks.push("<ol>");
+      }
+      blocks.push(`<li>${inlineMarkdown(ordered[1])}</li>`);
+      return;
+    }
+
+    closeList();
+    blocks.push(`<p>${inlineMarkdown(line)}</p>`);
+  });
+
+  closeList();
+  return blocks.join("");
+}
+
 function parseHitDice(hdText) {
   const cleaned = String(hdText || "").trim().toLowerCase();
   const fractionMatch = cleaned.match(/^(\d+)\s*\/\s*(\d+)$/);
@@ -112,19 +213,21 @@ function renderGroups(rows) {
         });
 
         const summaryEl = cardNode.querySelector(".summary");
-        summaryEl.textContent = `${monster.summary}`;
+        summaryEl.innerHTML = markdownToHtml(monster.summary);
 
+        const sourceRow = document.createElement("p");
+        sourceRow.className = "source-row";
         const sourceLink = document.createElement("a");
-        sourceLink.href = monster.sourceUrl || "#";
-        sourceLink.target = "_blank";
-        sourceLink.rel = "noreferrer noopener";
-        sourceLink.textContent = `Source: ${monster.source}`;
         sourceLink.className = "source-link";
-        if (!monster.sourceUrl) {
-          sourceLink.removeAttribute("href");
+        sourceLink.textContent = `Source: ${monster.source}`;
+        const href = safeHref(monster.sourceUrl);
+        if (href) {
+          sourceLink.href = href;
+          sourceLink.target = "_blank";
+          sourceLink.rel = "noreferrer noopener";
         }
-        summaryEl.appendChild(document.createTextNode(" "));
-        summaryEl.appendChild(sourceLink);
+        sourceRow.appendChild(sourceLink);
+        detailsEl.insertBefore(sourceRow, cardNode.querySelector(".stats"));
 
         const statsEl = cardNode.querySelector(".stats");
         statEntries({ ...monster.stats, groupNumber: monster.groupNumber }).forEach(([k, v]) => {

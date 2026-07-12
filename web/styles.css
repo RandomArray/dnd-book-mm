@@ -220,9 +220,48 @@ button:hover {
   color: var(--muted);
 }
 
-.source-link {
+.summary p {
+  margin: 0 0 0.35rem;
+}
+
+.summary p:last-child {
+  margin-bottom: 0;
+}
+
+.summary ul,
+.summary ol {
+  margin: 0 0 0.35rem;
+  padding-left: 1.1rem;
+}
+
+.summary code {
+  font-family: "Chakra Petch", sans-serif;
+  font-size: 0.72rem;
+  background: #f1e5d2;
+  border: 1px solid var(--line);
+  border-radius: 0.25rem;
+  padding: 0.02rem 0.2rem;
+}
+
+.summary-link {
   color: var(--brand);
-  font-weight: 600;
+  text-decoration: none;
+}
+
+.summary-link:hover {
+  text-decoration: underline;
+}
+
+.source-row {
+  margin: 0.3rem 0 0.35rem;
+  font-size: 0.76rem;
+  line-height: 1.25;
+}
+
+.source-link {
+  font-size: inherit;
+  color: var(--brand);
+  font-weight: 500;
   text-decoration: none;
 }
 
